@@ -1,0 +1,509 @@
+---
+title: 'Advanced Regression and Prediction. Part 1: Statistical tools'
+author: "Ilán F. Carretero Juchnowicz"
+date: "9/5/2021"
+output: 
+    rmdformats::readthedown: 
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: cerulean # from rmdformats package
+    highlight: haddock
+    fig_width: 10.5
+    fig_height: 7.5
+    fig_caption: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load th whole code, include=FALSE}
+
+source("C:\\Users\\carre\\Google Drive\\master_in_statistics_for_data_science\\semester 4\\3_advanced_regression_and_prediction\\final_project\\part_1_statistical_tools\\code_part1_statistical_tools_ILAN_CARRETERO.R", echo = TRUE)
+
+```
+
+
+
+
+## 1. Introduction and Objectives
+
+COVID-19 is the disease caused by the new coronavirus known as SARS-CoV-2. This disease has been the cause of the global pandemic in which we currently find ourselves.
+
+In this way, specifically in Spain we are in the fourth wave of the pandemic. Likewise, within the national territory there have been many variations in the incidence of COVID-19 according to the measures taken by each community and the impact of the respective waves.
+
+In this case, the project to be developed has been treated as a real case, in which the province of Valencia asks us for a tool from which new daily COVID-19 cases can be predicted, in order to be able to manage adequately the resources available to the province according to the predictions made.
+
+To do this, we are going to use the tools seen throughout the course, with the aim of, making use of such statistical methods, give an informed response to the problem posed by the province of Valencia.
+
+In short, _**we want a model that predicts new daily contagion cases in the province of Valencia.**_
+
+> Bibliography:
+[basic information about COVID-19](https://www.who.int/es/news-room/q-a-detail/coronavirus-disease-covid-19)
+
+---
+
+
+## 2. Dataset
+
+The dataset that has been selected to carry out the work has been provided to us [montera34](https://github.com/montera34) and it is in the repository [escovid19data](https://github.com/montera34/escovid19data), en particular en [Valencian Community dataset](https://docs.google.com/spreadsheets/d/1qxbKnU39yn6yYcNkBqQ0mKnIXmKfPQ4lgpNglpJ9frE/edit#gid=1293622837).
+
+In this way, said dataset has been built from the press releases published by the Generalitat Valenciana, and it is worth mentioning that in the middle of the pandemic the way of giving the figures of detected cases was changed. This will have to be taken into account when carrying out the preprocessing.
+
+It is worth mentioning that the official data source has been the Generalitat Valenciana in 87% and RTVE in 13%.
+
+Thus, when making a first visualization of the data, we observe the following:
+
+```{r first visualization of the data, echo=FALSE}
+
+knitr::kable(head(db, 10), "simple")
+
+```
+
+In this way we have the following variables:
+
+* **date**: Day, month and year of the observation
+* **province**: Valencia, Castellon and Alicante
+* **ccaa**: Valencian Community
+* **new_cases**: Variable to predict
+* **PCR_test**: Variable to join to new_cases because, as we said before is the same information as new cases.
+* **Activos**: COVID-19 positive population
+* **Hospitalized**: Hospitalized COVID-19 population.
+* **Hospitalized_accumulated**: Hospitalized accumulated COVID-19 population.
+* **Hospitalized_new**: New positive people in COVID-19 hospitalized.
+* **Intensive_care**: Population with COVID-19 in the intensive care unit.
+* **Deceased**: People who have died from COVID-19
+* **Case_accumulated**: Cumulative COVID-19 Cases
+* **Recovered**: People who have recovered from COVID-19
+* **Source_name**: Name of the source
+* **Source**: URL where the information of the data is.
+
+Thus, as we can simply observe in the first visualization of the data, there are many variables that will not be useful for our study and others that we will have to deal with due to the missing values in multiple variables.
+
+Therefore, in this project, preprocessing is going to be a fundamental step in order to later obtain good and consistent results.
+
+---
+
+## 3. Preprocessing and analysis
+
+##### 3.1 Discarded variables
+
+Of the initial variables, there is a large number that, because they did not provide useful information in themselves to predict, or because of a large number of missing values, we have not been able to use and therefore we have had to discard them. These variables have been the following:
+
+* **province**
+* **ccaa**
+* **hospitalized_accumulated**
+* **Activos**
+* **Hospitalized_new**
+* **Source_name**
+* **Source**
+
+---
+
+##### 3.2 Treatment of missing values
+
+Regarding the treatment of missing values, in the first place it has been visualized how many data we were missing from the variables that we were going to use in principle.
+
+```{r visualization missing values, echo=FALSE}
+
+aggr(db_valencia_v.1, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(db_valencia_v.1), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+
+```
+
+In this way, we can see how we have a large amount of missing data that we will have to deal with.
+
+Although it is true that, in order to complete the missing data as best as possible, it has been initially proposed to use a sophisticated method such as predictive mean matching (pmm), where a distribution of each variable is constructed and the missing values are imputed in a way. that fit into said distribution, finally a simple solution has been chosen, such as the imputation of missing values by means of the first immediately previous value that is not missing.
+
+The reason why we have opted for this solution is because, when representing the different variables as a function of time, the selected method presented less noisy variables than the first method presented.
+
+In this way, once all the missing values have been imputed, the variables that should be grouped have been put together, the date variable has been splited in day, month and year factors and the lag1 of the variable to be predicted has been added, in this case, new_cases. This has been done in order to capture the dynamics of the time series, so that we can treat the data as a classical static regression problem.
+
+Consequently, the variables that we have left from which we will make our predictions have been the following:
+
+* **Date**: Date variable.
+* **Day**: Unordered factor.
+* **Month**: Unordered factor.
+* **Year**: Unordered factor.
+* **Hospitalization**: Numerical variable.
+* **Recoveries**: Numerical variable.
+* **Deceased**: Numerical variable.
+* **Intensive care**: Numerical variable.
+* **New cases lag1**: Numerical variable.
+
+While our variable to predict is:
+
+* **New cases**: Numerical variable.
+
+---
+
+##### 3.3 Correlations
+
+The study of correlations is one of the most important parts of any data analysis, since it gives us some first ideas of what type of data we have, and what variables we think may become the most relevant initially.
+
+In this way, initially the existing linear correlation between the variables to be predicted and the numerical predictor variables has been represented.
+
+```{r correlation new_cases vs rest, echo=FALSE}
+
+corr_n_cases <- sort(cor(train[,c(2,3,4,5,6,10)])["n_cases",], decreasing = T)
+  corr=data.frame(corr_n_cases)
+  ggplot(corr,aes(x = row.names(corr), y = corr_n_cases)) + 
+    geom_bar(stat = "identity", fill = "#E9B479") + 
+    scale_x_discrete(limits= row.names(corr)) +
+    labs(x = "Predictors", y = "Number of cases", title = "Correlations") + 
+    theme(plot.title = element_text(hjust = 0, size = rel(1.5)),
+          axis.text.x = element_text(angle = 45, hjust = 1)) + theme_economist()
+  # a lot of variables with very interesting correlation
+
+```
+
+Thus we can see how `hospitalized` is highly correlated with `n_cases`, as well as `n_cases_lag1` and `i_care`. On the other hand, it is curious that `rec` and `dead` are not correlated with `n_cases`, so we have to represent these two variables.
+
+```{r the other correlations, echo=FALSE}
+
+ggplot(train, aes(x=dead, y=n_cases)) + ylab("number of cases") + 
+    geom_point(alpha=0.6) + ggtitle("Number of cases vs deceased of COVID-19") + theme_economist()
+  # Non-linear relation --> quadratic relation
+
+ggplot(train, aes(x=rec, y=n_cases)) + ylab("number of cases") + xlab("recoveries") + 
+    geom_point(alpha=0.6) + ggtitle("Number of cases vs recoveries of COVID-19") + theme_economist()
+  # N
+
+```
+
+In this way, we can appreciate how it seems that they have a quadratic correlation with `n_cases`.
+
+Looking at the correlations of all the numerical variables with each other, we obtain the following result:
+
+```{r correlation all with all, echo=FALSE}
+vec_quan <- c(2,3,4,5,6,10)
+  quan_db <-cor(train[,vec_quan])
+  corrplot::corrplot(quan_db, type="upper", order="hclust",
+           col=RColorBrewer::brewer.pal(n=8, name="RdYlBu"))
+  corrplot::corrplot(quan_db, method = "number")
+
+```
+
+
+And we can see how clearly `i_care` and `hosp` are strongly correlated, so we can probably dispense with the `i_care` variable since all the information it offers us is already collected in `hosp`. In addition; `hosp`, `n_cases`, and `n_cases_lag1` are also highly correlated with each other.
+
+---
+
+##### 3.4 Variable Selection
+
+Regarding the selection of variables, there are multiple methods. From the classics such as **step-wise**, to more sophisticated methods such as **recursive feature elimination** (Feature selection tool based on backward selection and variable importance (depending on chosen model) using Random Forest or the **Boruta** method (top-down search for relevant features using random forest).
+
+Thus, we present below the result of the last two methods mentioned, while the first one will be presented in the section corresponding to the selection of models.
+
+```{r rfe and boruta, echo = FALSE}
+ggplot(data = modelRFE, metric = "MAE") + theme_economist()
+
+knitr::kable(predictors(modelRFE), "simple")
+
+
+plot(boruta, cex.axis=.7, las=2, xlab="", main="Variable Importance")
+```
+
+Even so, it is convenient to remember that, although currently great progress has been made regarding the predictions of values, reaching minimal prediction errors, with regard to the variables section, the available methods still need to be improved, since that the results obtained, although not bad, are not completely consistent either.
+
+Therefore, such methods can be taken as a reference of which variables they consider to be the most relevant, but we will never know if these variables are really significant or not.
+
+---
+
+## 4. Advanced Estimation for Least Squares
+
+To estimate our variable to be predicted (n_cases), we initially started by performing a simple linear regression from the date variable and solved by means of the QR factorization (as done by R by default). In this way we have been complicating the model, in order to better capture the dynamics of the data. Likewise, in order to improve the models, we have been looking at the residuals, since they provide us with a large amount of information on the dynamics of the data and the adjustment carried out. Below we show some models as an illustrative purpose (to see all go to the code).
+
+$$
+n\_cases \sim date
+$$
+```{r first model, echo=FALSE}
+ggplot(train, aes(x=date, y=n_cases)) + geom_line(color="red", size=1.2) + 
+    stat_smooth(method="lm", formula=y ~ x, se=FALSE, col="black") + theme_economist()
+```
+
+* $\text{Residual standard error} = 961$
+* $R^2 = 0.037$
+
+$$
+n\_cases \sim date^3
+$$
+```{r plot cubic model, echo=FALSE}
+
+  ggplot(train, aes(x=date, y=n_cases)) + geom_line(color="red", size=1.2) + 
+  stat_smooth(method="lm", formula=y ~ poly(x,3), se=FALSE, col="black") + theme_economist()
+  
+```
+
+* $\text{Residual standard error} = 760.5$
+* $R^2 = 0.3988$
+
+$$
+n\_cases \sim date^3 + month + n\_cases\_lag1
+$$
+```{r last first model, echo=FALSE}
+
+ # predict with lag
+  model.season <- lm(n_cases ~  poly(date,3) + month + n_cases_lag1, train)
+ggplot(train, aes(x=date, y=n_cases)) + geom_line(color="red", size=1.2) + geom_line(y=predict(model.season))  + theme_economist()
+  # much much better  
+  
+```
+
+* $\text{Residual standard error} = 496.5$
+* $R^2 = 0.7531$
+
+Likewise, it is worth mentioning that we have left the last 4 observations of the dataset (from May 3, 2021 to May 7, 2021) as test data. In this way, the values obtained with this last model and the prediction intervals have been the following:
+
+```{r prediction values first, echo=FALSE}
+
+knitr::kable(predict(model.season, newdata = test, interval = 'prediction'))
+
+```
+
+Real values:
+
+* 58
+* 88
+* 81
+* 81
+
+In this way, we observe that, although the real values fall within the interval and, in turn, the predicted values are close to those observed, we can see how the confidence intervals are excessively large. This is due to the great variability of n_cases, which translates into confidence intervals that are too large. Still, to be the first approximation it is a decent model.
+
+Regarding the models that we are going to use from now on, they will be the following (because it has been proven that they are models with good results and very illustrative for the work in question.
+
+**Model S**:
+
+$$
+log(n\_cases) \sim month + log(n\_cases\_lag1) + log(hosp)
+$$
+
+* $RMSE = 0.54$
+* $R^2 = 0.86$
+
+**Model F**:
+
+$$
+log(n\_cases) \sim month*log(hosp) +  log(n\_cases\_lag1) + dead^2 + date + year + day
+$$
+
+* $RMSE = 0.6$
+* $R^2 = 0.82$
+
+---
+
+## 5. Extending Lineal Models
+
+
+##### 5.1 Local Regression
+
+For the local regression model, we have used the kernel density, where local approximations are made from which the regression of the entire set of the variable `n_cases` ends up being formed. The result has been the following:
+
+```{r local regression, echo=FALSE, warning=FALSE}
+
+train %>% ggplot(aes(x = date, y = n_cases, colour=month)) + geom_point() +
+    geom_smooth(method = "loess", formula = y~x, size = 1) + theme_economist()
+
+```
+
+Thus, we can observe how this regression captures the general or long-term trend of our target variable very well. However, it would be necessary to improve it to be able to correctly capture the short-term variable trends of `n_cases`.
+
+---
+
+##### 5.2 Robust Regression
+
+Robust regression is a very interesting technique, since it consists in giving less weight in the regression to those points that are considered outliers. Although it is true that, in cases where several outliers are presented, this type of technique is highly recommended, the main disadvantage is that it loses the interpretability of the betas of the regression model.
+
+Thus, the robust regression has been carried out with the Huber cost function and with the Bisquare cost function, obtaining the following results:
+
+Residuals per date (we can see the outliers)
+```{r robust regression representation, echo=FALSE}
+ggplot(train) + aes(x=date, y=rstudent(model.adv)) + geom_point() + 
+  geom_hline(yintercept=c(-2.33,2.33), color="blue") + theme_economist()
+```
+
+Representation of the robust regression with bisquare as a lost function for illustrative purposes:
+```{r bisquare, echo=FALSE}
+# Plot model
+  ggplot(train, aes(x=date, y=n_cases)) + geom_line(color="red", size=1.2) + geom_line(y=predict(linfit.bi))  + theme_economist()
+  
+
+```
+
+And the final result of the robust regression with each of the lost functions is the following:
+
+* **Huber lost function**: $\text{Residual standard error} = 129.6$
+* **Bisquare lost function**: $\text{Residual standard error} = 113$
+
+Therefore, we observe that in both cases the residual standard error is improved with respect to the previous methods.
+
+---
+
+## 6. Statistical Learning Tools
+
+For this section we have used the R caret package, from which we have set for all the methods that are going to be exposed an optimization of hyperparameters (in cases where there are hyperparameters) based on a cross validation of 5 folders repeated in turn 4 times. The reason for using this repeated cross-validation is basically to be able to perform the aforementioned hyperparameter optimization in a statistically robust way.
+
+---
+
+##### 6.1 Model Selection
+
+
+
+In the selection of models we have seen the following methods:
+
+* Forward regression: In this regression, we start with a variable and add more variables until we end up with the best model based on the criterion we select (for example, the AIC).
+
+* Backward regression: The reverse of the forward regression.
+
+* Step-wise regression: Variables are added and removed, until we find the best combination that minimizes or maximizes the criteria we select.
+
+**Example**: Step wise regression results
+
+```{r sw regression results, echo = FALSE}
+
+plot(step_tune)
+knitr::kable(coef(step_tune$finalModel, step_tune$bestTune$nvmax), "simple")
+
+```
+
+---
+
+##### 6.2 Regularization Methods
+
+In this section we have seen the following methods:
+
+* Ridge regression:It is a regression with a penalty factor (norm $l_2$ squared) that generates a biased model but reduces the variance in return. Thus, all betas are used (some very close to the value 0) and it has an analytical solution.
+
+* Lasso: Similar to ridge regression but this time the penalty factor is the $l1$ norm. It generates that some coefficients of the betas have a value equal to 0, so that at the same time as the prediction it makes a selection of variables. It usually gets worse prediction results than ridge, but instead performs variable selection.
+
+* Elastic net: Combination of ridge and lasso. When using both methods, it tends to predict very well, although since it is necessary to optimize two hyperparameters, its computational cost is higher.
+
+**Example**: Elastic net results
+
+* Variable importance for elastic net
+
+```{r elastic net vi, echo=FALSE}
+
+importance <- varImp(glmnet_tune, scale=FALSE)
+  plot(importance)
+
+```
+
+
+* Results elastic net
+
+```{r elastic net results, echo=FALSE}
+
+plot(glmnet_tune)
+
+```
+
+
+* Best hyper-parameter tune from the grid search applied
+
+```{r elastic net best, echo=FALSE}
+
+knitr::kable(glmnet_tune$bestTune)
+
+```
+
+---
+
+##### 6.3 Dimension Reduction
+
+In this section we have seen two methods from which, through the linear combination of the original variables of the dataset, latent variables are created by which the dimensionality of the dataset is reduced and the target variable can also be predicted.
+
+* Principal Component Regression (PCR): A PCA is performed on the predictor variables, so the eigenvalues are used to determine the importance of the variables and thus assign them more or less weight in the linear combination.
+
+* Partial Least Squares (PLS): The variable to be predicted is also taken into account, so that the importance of the predictor variables depends on the correlation they have with the variable to be predicted.
+
+**Example**: PCR repeated cross validation result
+
+```{r pcr result, echo = FALSE}
+
+plot(pcr_tune)
+
+```
+
+---
+
+## 7. Results, Combinations and predictive intervals
+
+Once all the models have been made and tested against the set of tests, the following metrics have been obtained:
+
+```{r total metrics, echo=FALSE}
+
+knitr::kable(test_results, "simple")
+
+```
+
+Thus, we can see how the best models given the metrics are the following:
+
+* Elastic Net
+* Linear ModelS
+* PLS
+
+And in turn, we can see the correlations of all the tested models.
+
+```{r correlation, echo=FALSE}
+test_results %>%
+    dplyr::select(-n_cases) %>%
+    ggcorr(palette = "RdBu", label = TRUE) + labs(title = "Correlations between different models")
+
+```
+
+Thus, we can see how there are models that are highly correlated with each other, while there are others that hardly correlate. Finally, as seen in the results table previously shown, a combination of the three best models indicated has been made, so that the estimation of new cases of COVID-19 is made from the average of the three models . This procedure is useful, since it gives our combined model greater robustness.
+
+Finally, there are times where we want to use our own cost function to evaluate the quality of our predictions. Thus, in this case it is necessary to take into account that, if we work with prediction intervals, these are conditioned to our variables, unlike the intervals of classical statistics.
+
+In our case, the prediction intervals have been obtained directly from the regression model set forth above. Thus, first the linear model has been run, then the predictions have been transferred to the corresponding scale since they were on a logarithmic scale, and finally the prediction intervals have been visualized obtaining the following result.
+
+```{r final confidence intervals, echo = FALSE}
+
+# take a simple but good lm:
+  linFit <- lm(log(n_cases) ~ month + log(n_cases_lag1) + log(hosp), data=train)
+  # obtain the prediction intervals directly:
+  predictions <- exp(predict.lm(linFit, newdata=test, interval="prediction", level=0.90))
+  head(predictions)
+  predictions=as.data.frame(predictions)
+  predictions$real = exp(test_results$n_cases)
+  
+  predictions = predictions %>% mutate(out=factor(if_else(real<lwr | real>upr,1,0)))
+  # how many real observations are out of the intervals? --> 0 but a lot of variability
+  mean(predictions$out==1)
+  
+  # visualization of the confidence intervals
+  ggplot(predictions, aes(x=fit, y=real))+
+    geom_point(aes(color=out)) + theme(legend.position="none") +
+    geom_ribbon(data=predictions,aes(ymin=lwr,ymax=upr),alpha=0.3) +
+    labs(title = "Prediction intervals", x = "prediction",y="real number of cases") + theme_economist()
+  
+  
+
+```
+
+In this way, we observe how in this case the real values of new cases of COVID-19 of the test set in this case would be within our prediction intervals. However, it is necessary to emphasize that, due to the great variability of the variable to predict n_cases, the prediction interval has a very large size, so it is not a conclusive result.
+
+---
+
+## 8. Conclusions and future lines
+
+Through the work carried out in the first place, the main objective of the project in question has been fulfilled, to obtain consistent models from which it is possible to predict future cases of COVID-19 on a daily basis. Thus, although it is true that the estimates of the models obtained with respect to the set of tests are slightly lower than the value they should, we have ended up obtaining models that approximate future cases of COVID-19 relatively well (although of course they can be improved).
+
+Thus, the test values have fallen within our prediction intervals, which, despite the fact that these intervals given the variability of the new documented cases is excessively large, is very useful for health planning in the province of Valencia regarding COVID-19.
+
+On the other hand, thanks to the work carried out, the usefulness of statistical tools to obtain models capable of predicting very well and even adequately explaining new cases of COVID-19 (depending on the model and our interest through its production).
+
+Finally, it should be noted that as future lines of the project that I consider to be of great interest we could establish the following:
+
+* Prediction of the first wave to observe the differences of our model (probably higher values than those reported publicly) with the values that were published.
+
+* Analysis of the provinces of Castellón and Alicante, being able to appreciate the differences between provinces that belong to the same community.
+
+* Grouping of provincial datasets to obtain an autonomous dataset and thus carry out the study in general terms of the Valencian community.
+
+---
+
+> Bibliography: notes, slides and case studies proposed and carried out by J. Nogales.
